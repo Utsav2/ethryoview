@@ -12,8 +12,6 @@ import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
@@ -27,7 +25,7 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
+import java.util.Arrays;
 
 import au.com.bytecode.opencsv.CSVWriter;
 import ca.uol.aig.fftpack.RealDoubleFFT;
@@ -48,13 +46,16 @@ public class MainActivity extends Activity {
     RecordAudio recordTask;
 
     ImageView imageView;
+    ImageView imageView2;
     Bitmap bitmap;
-    Canvas canvas;
+
+    Canvas mainCanvas;
+    Canvas transformedCanvas;
     Paint paint;
 
     int height;
     FileWriter  fileWriter;
-    String filename = "Data.csv";
+    String filename = "data.csv";
     CSVWriter writer;
 
     @Override
@@ -63,7 +64,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         try {
-            fileWriter = new FileWriter(getCacheDir().getAbsolutePath() + File.pathSeparator + filename);
+            fileWriter = new FileWriter(getExternalCacheDir().getAbsolutePath() + File.pathSeparator + filename);
             writer = new CSVWriter(fileWriter);
         } catch (IOException e) {
             Log.e("ETHRYOVIEW", "Couldnt save file", e);
@@ -100,15 +101,29 @@ public class MainActivity extends Activity {
         transformer = new RealDoubleFFT(blockSize);
 
         imageView = (ImageView) this.findViewById(R.id.ImageView01);
+
         DisplayMetrics dm = getResources().getDisplayMetrics();
+
+        float heightFactor = 0.65f;
+
         int width = (int)((float)dm.widthPixels * 0.8);
-        height = (int)((float)dm.heightPixels * 0.65);
+        height = (int)((float)dm.heightPixels * heightFactor/2);
+
         bitmap = Bitmap.createBitmap(width, height,
                 Bitmap.Config.ARGB_8888);
-        canvas = new Canvas(bitmap);
+
+        transformedCanvas = new Canvas(bitmap);
+
         paint = new Paint();
         paint.setColor(Color.GREEN);
+
         imageView.setImageBitmap(bitmap);
+
+        imageView2 = (ImageView) this.findViewById(R.id.ImageView02);
+        Bitmap bitmap2 = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+
+        mainCanvas = new Canvas(bitmap2);
+        imageView2.setImageBitmap(bitmap2);
 
     }
 
@@ -118,8 +133,7 @@ public class MainActivity extends Activity {
         protected Void doInBackground(Void... arg0) {
 
             try {
-                int bufferSize = AudioRecord.getMinBufferSize(frequency,
-                        channelConfiguration, audioEncoding);
+                int bufferSize = AudioRecord.getMinBufferSize(frequency, channelConfiguration, audioEncoding);
 
                 AudioRecord audioRecord = new AudioRecord(
                         MediaRecorder.AudioSource.MIC, frequency,
@@ -134,35 +148,35 @@ public class MainActivity extends Activity {
                 // following while loop
 
                 while (started) {
-                    int bufferReadResult = audioRecord.read(buffer, 0,
-                            blockSize);
+                    int bufferReadResult = audioRecord.read(buffer, 0, blockSize);
+
+                    double peakAmplitude = Double.NEGATIVE_INFINITY;
 
                     for (int i = 0; i < blockSize && i < bufferReadResult; i++) {
-                        toTransform[i] = (double) buffer[i] / 32768.0; // signed
-                        // 16
-                    }                                       // bit
+                        double c = (double) buffer[i];
+                        peakAmplitude = peakAmplitude > c ? peakAmplitude : c;
+                        toTransform[i] = c/32768.0; // signed
+                    }
+
+                    // http://stackoverflow.com/questions/16072185/decibels-in-android
+                    double peakAmplitudeInDecibel = 20 * Math.log10(peakAmplitude/32678.0);
+
+                    double [] amplitudeArray = {peakAmplitudeInDecibel};
+
                     toTransform = hanningWindow(toTransform, 0, blockSize);
+                    double [] mainTransform = Arrays.copyOf(toTransform, toTransform.length);
+
                     transformer.ft(toTransform);
-                    publishProgress(toTransform);
+
+                    publishProgress(mainTransform, toTransform, amplitudeArray);
                 }
 
                 audioRecord.stop();
 
             } catch (Throwable t) {
-                t.printStackTrace();
-                Log.e("AudioRecord", "Recording Failed");
+                Log.e("AudioRecord", "Recording Failed", t);
             }
             return null;
-        }
-
-        private short[] hanningWindow(short[] signal_in, int pos, int size)
-        {
-            for (int i = pos; i < pos + size; i++)
-            {
-                int j = i - pos; // j = index into Hann window function
-                signal_in[i] = (short) (signal_in[i] * 0.5 * (1.0 - Math.cos(2.0 * Math.PI * j / size)));
-            }
-            return signal_in;
         }
 
         private double[] hanningWindow(double[] signal_in, int pos, int size)
@@ -170,39 +184,63 @@ public class MainActivity extends Activity {
             for (int i = pos; i < pos + size; i++)
             {
                 int j = i - pos; // j = index into Hann window function
-                signal_in[i] = (double) (signal_in[i] * 0.5 * (1.0 - Math.cos(2.0 * Math.PI * j / size)));
+                signal_in[i] = (signal_in[i] * 0.5 * (1.0 - Math.cos(2.0 * Math.PI * j / size)));
             }
             return signal_in;
         }
 
         @Override
-        protected void onProgressUpdate(double[]... toTransform) {
+        protected void onProgressUpdate(double[]... args) {
 
-            canvas.drawColor(Color.BLACK);
+            double [] mainTransform = args[0];
+            double [] toTransform = args[1];
+            double peakAmplitude = args[2][0];
+
+            mainCanvas.drawColor(Color.BLACK);
+            transformedCanvas.drawColor(Color.BLACK);
+
+            for (int x = 0; x < mainTransform.length; x++) {
+               double y = mainTransform[x];
+               int downy = (int) (height - (mainTransform[x] * height/10));
+               int upy = height;
+               mainCanvas.drawLine(x, downy, x, upy, paint);
+            }
 
             int maxX = 0;
             Double max = Double.NEGATIVE_INFINITY;
-            for (int x = 0; x < toTransform[0].length; x++) {
-                double y = toTransform[0][x];
+
+            boolean lightUp = false;
+
+            for (int x = 0; x < toTransform.length; x++) {
+
+                double y = toTransform[x];
+
+                if (y < 1500) {
+                    break;
+                }
+
+                if (y > 400 && y < 900 && peakAmplitude > 30) {
+                   lightUp = true;
+                }
+
                 maxX = max > y ? maxX : x;
                 max = max > y ? max : y;
-                int downy = (int) (height - (toTransform[0][x] * height/10));
+                int downy = (int) (height - (toTransform[x] * height/10));
                 int upy = height;
-                canvas.drawLine(x, downy, x, upy, paint);
+                transformedCanvas.drawLine(x, downy, x, upy, paint);
             }
 
             maxX = maxX * frequency / (blockSize * 2);
 
-            frequencyTextView.setText(Double.toString(maxX) + " Hz");
+            // frequencyTextView.setText(Double.toString(maxX) + " Hz");
+            frequencyTextView.setText(Boolean.toString(lightUp));
 
-            String unix = Long.toString(System.currentTimeMillis() / 1000L);
+            String unix = Long.toString(System.currentTimeMillis() / 100L);
             String [] toWrite = {unix, Double.toString(maxX)};
             writer.writeNext(toWrite);
 
             imageView.invalidate();
-
-            // TODO Auto-generated method stub
-            // super.onProgressUpdate(values);
+            imageView2.invalidate();
         }
 
     }
@@ -213,17 +251,17 @@ public class MainActivity extends Activity {
         } catch (IOException e) {
             Log.d("ETHRYOVIEW", "Error while trying to flush", e);
         }
-        File f = new File(getCacheDir().getAbsolutePath() + File.pathSeparator + filename);
+
+        File f = new File(getExternalCacheDir().getAbsolutePath() + File.pathSeparator + filename);
         f.setReadable(true, false);
+
         if (f.exists()) {
             Intent intentShareFile = new Intent(Intent.ACTION_SEND);
             intentShareFile.setType("application/csv");
-            intentShareFile.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + f.getAbsolutePath()));
-            intentShareFile.putExtra(Intent.EXTRA_SUBJECT,
-                    "Sharing File...");
-            intentShareFile.putExtra(Intent.EXTRA_TEXT, "Sharing File...");
-
-            startActivity(Intent.createChooser(intentShareFile, "Share File"));
+            intentShareFile.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(f));
+            intentShareFile.putExtra(Intent.EXTRA_SUBJECT, filename);
+            intentShareFile.putExtra(Intent.EXTRA_TEXT, filename);
+            startActivityForResult(Intent.createChooser(intentShareFile, "Share File"), 1);
         } else {
             Toast.makeText(getApplicationContext(), "No data exists", Toast.LENGTH_SHORT).show();
         }

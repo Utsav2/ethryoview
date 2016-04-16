@@ -10,6 +10,13 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content">
     </ImageView>
+
+    <ImageView
+        android:id="@+id/ImageView02"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
+    </ImageView>
+
     <Button
         android:text="Start"
         android:id="@+id/StartStopButton" android:layout_width="wrap_content"
