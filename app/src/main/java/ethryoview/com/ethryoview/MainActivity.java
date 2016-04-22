@@ -54,6 +54,9 @@ public class MainActivity extends Activity {
     int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
     private RealDoubleFFT transformer;
     int blockSize = 256;
+    long lastLightOn = 0;
+    long difference = 0;
+    long bpm = 0;
 
     Button startStopButton;
     TextView frequencyTextView;
@@ -249,6 +252,7 @@ public class MainActivity extends Activity {
             yVals = new ArrayList<Entry>();
 
             boolean lightUp = false;
+            long time = 0;
 
             String lowfreq = ((EditText)(findViewById(R.id.editText2))).getText().toString();
             int lowFreq = 300;
@@ -292,6 +296,7 @@ public class MainActivity extends Activity {
                 }
                 if (freq > lowFreq && freq < highFreq && peakAmplitude > amp) {
                     lightUp = true;
+                    time = System.currentTimeMillis();
                 }
                 double y = toTransform[x];
 
@@ -306,9 +311,21 @@ public class MainActivity extends Activity {
                 }
             }
 
+            if (lastLightOn != 0 && time != 0) {
+                difference = time - lastLightOn;
+            }
+
+            if (difference > 400 && difference < 1500) {
+               bpm = 60000/difference;
+            }
+
+            if (System.currentTimeMillis() - lastLightOn > 2000) {
+                bpm = 0;
+            }
+
             maxX = maxX * frequency / (blockSize * 2);
 
-            if (lightUp) {
+            if (bpm >= 60 && bpm <= 120) {
                 paint.setColor(Color.GREEN);
             }
             else {
@@ -331,7 +348,9 @@ public class MainActivity extends Activity {
             lineChart2.getAxisRight().setAxisMaxValue(10f);
             lineChart2.setData(data);
 
-            frequencyTextView.setText(Double.toString(peakAmplitude) + " dB | " + Double.toString(maxX) + " Hz");
+            String toShow = Double.toString(peakAmplitude) + " dB | " + Double.toString(maxX) + " Hz" + " | " + Long.toString(bpm) + " BPM";
+
+            frequencyTextView.setText(toShow);
 
             String unix = Long.toString(System.currentTimeMillis() / 100L);
             vals[0] = unix;
@@ -340,6 +359,10 @@ public class MainActivity extends Activity {
 //
             lineChart1.invalidate();
             lineChart2.invalidate();
+
+            if (time != 0) {
+                lastLightOn = time;
+            }
         }
 
     }
