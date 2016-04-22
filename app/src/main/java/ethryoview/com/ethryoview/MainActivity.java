@@ -1,16 +1,23 @@
 package ethryoview.com.ethryoview;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.drawable.BitmapDrawable;
 import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.media.audiofx.AcousticEchoCanceler;
+import android.media.audiofx.AutomaticGainControl;
+import android.media.audiofx.NoiseSuppressor;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -18,13 +25,22 @@ import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import au.com.bytecode.opencsv.CSVWriter;
@@ -33,7 +49,7 @@ import ca.uol.aig.fftpack.RealDoubleFFT;
 public class MainActivity extends Activity {
 
     // taken from here, and adapted http://stackoverflow.com/questions/5511250/capturing-sound-for-analysis-and-visualizing-frequencies-in-android
-    int frequency = 8000;
+    int frequency = 11025;
     int channelConfiguration = AudioFormat.CHANNEL_CONFIGURATION_MONO;
     int audioEncoding = AudioFormat.ENCODING_PCM_16BIT;
     private RealDoubleFFT transformer;
@@ -45,18 +61,17 @@ public class MainActivity extends Activity {
 
     RecordAudio recordTask;
 
-    ImageView imageView;
-    ImageView imageView2;
-    Bitmap bitmap;
-
-    Canvas mainCanvas;
-    Canvas transformedCanvas;
-    Paint paint;
+    LineChart lineChart1;
+    LineChart lineChart2;
 
     int height;
     FileWriter  fileWriter;
     String filename = "data.csv";
     CSVWriter writer;
+
+    ImageView circleView;
+    Paint paint;
+    Canvas canvas;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -100,31 +115,22 @@ public class MainActivity extends Activity {
 
         transformer = new RealDoubleFFT(blockSize);
 
-        imageView = (ImageView) this.findViewById(R.id.ImageView01);
+        lineChart1 = (LineChart) this.findViewById(R.id.ImageView01);
+        lineChart2 = (LineChart) this.findViewById(R.id.ImageView02);
+        circleView = (ImageView)findViewById(R.id.circleView);
 
-        DisplayMetrics dm = getResources().getDisplayMetrics();
+        Bitmap bitmap = Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888);
+        bitmap = bitmap.copy(bitmap.getConfig(), true);
+        canvas = new Canvas(bitmap);
 
-        float heightFactor = 0.65f;
+        paint = new Paint();                          //define paint and paint color
+        paint.setColor(Color.RED);
+        paint.setStyle(Paint.Style.FILL_AND_STROKE);
+        paint.setStrokeWidth(2f);
 
-        int width = (int)((float)dm.widthPixels * 0.8);
-        height = (int)((float)dm.heightPixels * heightFactor/2);
-
-        bitmap = Bitmap.createBitmap(width, height,
-                Bitmap.Config.ARGB_8888);
-
-        transformedCanvas = new Canvas(bitmap);
-
-        paint = new Paint();
-        paint.setColor(Color.GREEN);
-
-        imageView.setImageBitmap(bitmap);
-
-        imageView2 = (ImageView) this.findViewById(R.id.ImageView02);
-        Bitmap bitmap2 = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-
-        mainCanvas = new Canvas(bitmap2);
-        imageView2.setImageBitmap(bitmap2);
-
+        circleView.setImageBitmap(bitmap);
+        canvas.drawCircle(5, 5, 1, paint);
+        circleView.invalidate();
     }
 
     public class RecordAudio extends AsyncTask<Void, double[], Void> {
@@ -133,11 +139,38 @@ public class MainActivity extends Activity {
         protected Void doInBackground(Void... arg0) {
 
             try {
-                int bufferSize = AudioRecord.getMinBufferSize(frequency, channelConfiguration, audioEncoding);
 
-                AudioRecord audioRecord = new AudioRecord(
-                        MediaRecorder.AudioSource.MIC, frequency,
-                        channelConfiguration, audioEncoding, bufferSize);
+                String TAG = "ETHRYOVIEW";
+
+                int bufferSize = AudioRecord.getMinBufferSize(frequency, channelConfiguration, audioEncoding);
+                AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, frequency, channelConfiguration, audioEncoding, bufferSize);
+
+                AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+
+                audioManager.setMode(AudioManager.MODE_IN_CALL);
+                audioManager.setParameters("noise_suppression=on");
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    Log.i(TAG, "Trying to clean up audio because running on SDK " + Build.VERSION.SDK_INT);
+
+                    if (NoiseSuppressor.create(audioRecord.getAudioSessionId()) == null) {
+                        Log.i(TAG, "NoiseSuppressor not present :(");
+                    } else {
+                        Log.i(TAG, "NoiseSuppressor enabled!");
+                    }
+
+                    if (AutomaticGainControl.create(audioRecord.getAudioSessionId()) == null) {
+                        Log.i(TAG, "AutomaticGainControl not present :(");
+                    } else {
+                        Log.i(TAG, "AutomaticGainControl enabled!");
+                    }
+
+                    if (AcousticEchoCanceler.create(audioRecord.getAudioSessionId()) == null) {
+                        Log.i(TAG, "AcousticEchoCanceler not present :(");
+                    } else {
+                        Log.i(TAG, "AcousticEchoCanceler enabled!");
+                    }
+                }
 
                 short[] buffer = new short[blockSize];
                 double[] toTransform = new double[blockSize];
@@ -160,14 +193,11 @@ public class MainActivity extends Activity {
 
                     // http://stackoverflow.com/questions/16072185/decibels-in-android
                     double peakAmplitudeInDecibel = 20 * Math.log10(peakAmplitude/32678.0);
-
-                    double [] amplitudeArray = {peakAmplitudeInDecibel};
-
+                    peakAmplitudeInDecibel += 56.9;
+                    double [] amplitudeArray = { peakAmplitudeInDecibel };
                     toTransform = hanningWindow(toTransform, 0, blockSize);
                     double [] mainTransform = Arrays.copyOf(toTransform, toTransform.length);
-
                     transformer.ft(toTransform);
-
                     publishProgress(mainTransform, toTransform, amplitudeArray);
                 }
 
@@ -196,51 +226,120 @@ public class MainActivity extends Activity {
             double [] toTransform = args[1];
             double peakAmplitude = args[2][0];
 
-            mainCanvas.drawColor(Color.BLACK);
-            transformedCanvas.drawColor(Color.BLACK);
+            ArrayList<String> xVals = new ArrayList<String>();
+            ArrayList<Entry> yVals = new ArrayList<Entry>();
 
             for (int x = 0; x < mainTransform.length; x++) {
-               double y = mainTransform[x];
-               int downy = (int) (height - (mainTransform[x] * height/10));
-               int upy = height;
-               mainCanvas.drawLine(x, downy, x, upy, paint);
+                double y = mainTransform[x];
+                int downy = (int) (height - (mainTransform[x] * height/10));
+                int upy = height;
+                xVals.add((x) + "");
+                yVals.add(new Entry(new Float(y), x));
             }
+
+            LineDataSet set1;
+
+            set1 = new LineDataSet(yVals, "Time domain");
+            ArrayList<ILineDataSet> dataSets = new ArrayList<ILineDataSet>();
+            dataSets.add(set1); // add the datasets
+            LineData data = new LineData(xVals, dataSets);
+            lineChart1.setData(data);
+
+            xVals = new ArrayList<String>();
+            yVals = new ArrayList<Entry>();
+
+            boolean lightUp = false;
+
+            String lowfreq = ((EditText)(findViewById(R.id.editText2))).getText().toString();
+            int lowFreq = 300;
+
+            if (!lowfreq.isEmpty()) {
+                lowFreq = Integer.parseInt(lowfreq);
+            }
+
+            String highfreq = ((EditText)(findViewById(R.id.editText3))).getText().toString();
+            int highFreq = 900;
+
+            if (!highfreq.isEmpty()) {
+                highFreq = Integer.parseInt(highfreq);
+            }
+
+            String ampl = ((EditText)(findViewById(R.id.editText))).getText().toString();
+            double amp = 25;
+
+            if (!ampl.isEmpty()) {
+                amp = Double.parseDouble(ampl);
+            }
+
 
             int maxX = 0;
             Double max = Double.NEGATIVE_INFINITY;
 
-            boolean lightUp = false;
+            int maxFreq = 1000;
+
+            String [] vals = new String [maxFreq+1];
+
+            for(int i = 1; i < maxFreq + 1; i++) {
+                vals[i] = "0";
+            }
 
             for (int x = 0; x < toTransform.length; x++) {
 
-                double y = toTransform[x];
+                int freq = x * frequency/(blockSize * 2);
 
-                if (y < 1500) {
+                if (freq > 1500) {
                     break;
                 }
-
-                if (y > 400 && y < 900 && peakAmplitude > 30) {
-                   lightUp = true;
+                if (freq > lowFreq && freq < highFreq && peakAmplitude > amp) {
+                    lightUp = true;
                 }
+                double y = toTransform[x];
 
                 maxX = max > y ? maxX : x;
                 max = max > y ? max : y;
-                int downy = (int) (height - (toTransform[x] * height/10));
-                int upy = height;
-                transformedCanvas.drawLine(x, downy, x, upy, paint);
+
+                xVals.add(freq + "");
+                yVals.add(new Entry(new Float(y), x));
+
+                if (freq > 0 && freq <= maxFreq && y > 0) {
+                    vals[freq] = Double.toString(20 * Math.log10(y) + 56.9);
+                }
             }
 
             maxX = maxX * frequency / (blockSize * 2);
 
-            // frequencyTextView.setText(Double.toString(maxX) + " Hz");
-            frequencyTextView.setText(Boolean.toString(lightUp));
+            if (lightUp) {
+                paint.setColor(Color.GREEN);
+            }
+            else {
+                paint.setColor(Color.RED);
+            }
+
+            canvas.drawCircle(5, 5, 1, paint);
+
+            circleView.invalidate();
+
+            set1 = new LineDataSet(yVals, "Frequency domain");
+            set1.setDrawValues(false);
+            dataSets = new ArrayList<ILineDataSet>();
+            dataSets.add(set1); // add the datasets
+            data = new LineData(xVals, dataSets);
+
+            lineChart2.getAxisLeft().setAxisMinValue(-10f);
+            lineChart2.getAxisRight().setAxisMinValue(-10f);
+            lineChart2.getAxisLeft().setAxisMaxValue(10f);
+            lineChart2.getAxisRight().setAxisMaxValue(10f);
+            lineChart2.setData(data);
+
+            frequencyTextView.setText(Double.toString(peakAmplitude) + " dB | " + Double.toString(maxX) + " Hz");
 
             String unix = Long.toString(System.currentTimeMillis() / 100L);
-            String [] toWrite = {unix, Double.toString(maxX)};
-            writer.writeNext(toWrite);
-
-            imageView.invalidate();
-            imageView2.invalidate();
+            vals[0] = unix;
+//            String [] toWrite = {unix, Double.toString(maxX)};
+            writer.writeNext(vals);
+//
+            lineChart1.invalidate();
+            lineChart2.invalidate();
         }
 
     }

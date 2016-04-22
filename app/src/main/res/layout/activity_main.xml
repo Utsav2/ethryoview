@@ -5,35 +5,90 @@
     android:layout_height="fill_parent"
     >
 
-    <ImageView
+    <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/ImageView01"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content">
-    </ImageView>
+        android:layout_height="166dp">
+    </com.github.mikephil.charting.charts.LineChart>
 
-    <ImageView
+    <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/ImageView02"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content">
-    </ImageView>
-
-    <Button
-        android:text="Start"
-        android:id="@+id/StartStopButton" android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal">
-    </Button>
-
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Share"
-        android:id="@+id/button"
-        android:layout_gravity="center_horizontal" />
+        android:layout_height="166dp">
+    </com.github.mikephil.charting.charts.LineChart>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/frequencyTextView"
         android:layout_gravity="center_horizontal" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:text="Start"
+            android:id="@+id/StartStopButton" android:layout_width="72dp"
+            android:layout_height="74dp"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true">
+        </Button>
+
+        <Button
+            android:layout_width="102dp"
+            android:layout_height="wrap_content"
+            android:text="Share"
+            android:id="@+id/button"
+            android:layout_alignParentTop="true"
+            android:layout_toRightOf="@+id/StartStopButton"
+            android:layout_alignBottom="@+id/StartStopButton" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="fill_parent"
+            android:id="@+id/circleView"
+            android:layout_alignParentTop="true"
+            android:layout_toRightOf="@+id/button"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true" />
+
+        <EditText
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:ems="10"
+            android:id="@+id/editText"
+            android:hint="Amp"
+            android:layout_below="@+id/StartStopButton"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true" />
+
+        <EditText
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:ems="10"
+            android:id="@+id/editText2"
+            android:hint="Min"
+            android:layout_below="@+id/editText"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_alignRight="@+id/editText"
+            android:layout_alignEnd="@+id/editText" />
+
+        <EditText
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:ems="10"
+            android:hint="Max"
+            android:id="@+id/editText3"
+            android:layout_below="@+id/editText"
+            android:layout_toRightOf="@+id/editText"
+            android:layout_toEndOf="@+id/editText" />
+
+    </RelativeLayout>
 </LinearLayout>
