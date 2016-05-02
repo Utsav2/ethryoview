@@ -9,13 +9,13 @@
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/ImageView01"
         android:layout_width="fill_parent"
-        android:layout_height="166dp">
+        android:layout_height="306dp">
     </com.github.mikephil.charting.charts.LineChart>
 
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/ImageView02"
         android:layout_width="fill_parent"
-        android:layout_height="166dp">
+        android:layout_height="300dp">
     </com.github.mikephil.charting.charts.LineChart>
 
     <TextView

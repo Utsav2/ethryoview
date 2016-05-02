@@ -19,7 +19,6 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
@@ -76,10 +75,16 @@ public class MainActivity extends Activity {
     Paint paint;
     Canvas canvas;
 
+    long lightLastStatus;
+    boolean lightStatus;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        long lightLastStatus = 0l;
+        boolean lightStatus = false;
 
         try {
             fileWriter = new FileWriter(getExternalCacheDir().getAbsolutePath() + File.pathSeparator + filename);
@@ -255,21 +260,21 @@ public class MainActivity extends Activity {
             long time = 0;
 
             String lowfreq = ((EditText)(findViewById(R.id.editText2))).getText().toString();
-            int lowFreq = 300;
+            int lowFreq = 500;
 
             if (!lowfreq.isEmpty()) {
                 lowFreq = Integer.parseInt(lowfreq);
             }
 
             String highfreq = ((EditText)(findViewById(R.id.editText3))).getText().toString();
-            int highFreq = 900;
+            int highFreq = 700;
 
             if (!highfreq.isEmpty()) {
                 highFreq = Integer.parseInt(highfreq);
             }
 
             String ampl = ((EditText)(findViewById(R.id.editText))).getText().toString();
-            double amp = 25;
+            double amp = 38;
 
             if (!ampl.isEmpty()) {
                 amp = Double.parseDouble(ampl);
@@ -325,10 +330,23 @@ public class MainActivity extends Activity {
 
             maxX = maxX * frequency / (blockSize * 2);
 
-            if (bpm >= 60 && bpm <= 120) {
-                paint.setColor(Color.GREEN);
+            if (bpm >= 40 && bpm <= 150) {
+
+                if (!lightStatus) {
+                    lightLastStatus = System.currentTimeMillis();
+                }
+
+                if (System.currentTimeMillis() - lightLastStatus < 2000) {
+                    paint.setColor(Color.YELLOW);
+                } else {
+                    paint.setColor(Color.GREEN);
+                }
+
+                lightStatus = true;
             }
             else {
+                lightStatus = false;
+                lightLastStatus = 0;
                 paint.setColor(Color.RED);
             }
 
@@ -354,9 +372,7 @@ public class MainActivity extends Activity {
 
             String unix = Long.toString(System.currentTimeMillis() / 100L);
             vals[0] = unix;
-//            String [] toWrite = {unix, Double.toString(maxX)};
             writer.writeNext(vals);
-//
             lineChart1.invalidate();
             lineChart2.invalidate();
 
